@@ -40,6 +40,7 @@
 #include <DiskArbitration/DiskArbitration.h>
 
 static int quiet_mode = 0;
+static int debug_mode = 0;
 
 enum {
 	KEY_ALLOW_ROOT,
@@ -51,6 +52,7 @@ enum {
 	KEY_QUIET,
 	KEY_RO,
 	KEY_VERSION,
+	KEY_DEBUG,
 };
 
 struct mount_opts {
@@ -60,12 +62,15 @@ struct mount_opts {
 	char *kernel_opts;
 	char *modules;
 	char *volicon;
+	char *volname;
+	char *listen_addr;
 };
 
 static const struct fuse_opt fuse_mount_opts[] = {
 	{ "allow_other", offsetof(struct mount_opts, allow_other), 1 },
 	{ "allow_root", offsetof(struct mount_opts, allow_root), 1 },
 	{ "modules=%s", offsetof(struct mount_opts, modules), 0 },
+	{ "volname=%s", offsetof(struct mount_opts, volname), 0 },
 	FUSE_OPT_KEY("allow_root",	      KEY_ALLOW_ROOT),
 	FUSE_OPT_KEY("auto_cache",	      KEY_AUTO_CACHE),
 	FUSE_OPT_KEY("-r",		      KEY_RO),
@@ -175,33 +180,15 @@ static const struct fuse_opt fuse_mount_opts[] = {
 	FUSE_OPT_KEY("sparse",		      KEY_KERN),
 	FUSE_OPT_KEY("subtype=",	      KEY_IGNORED),
 	{ "volicon=%s", offsetof(struct mount_opts, volicon), 0 },
-	FUSE_OPT_KEY("volname=",	      KEY_KERN),
+	FUSE_OPT_KEY("debug",		      KEY_DEBUG),
+	FUSE_OPT_KEY("-d",		     	  KEY_DEBUG),
+	{ "listen_addr=%s", offsetof(struct mount_opts, listen_addr), 0 },
 	FUSE_OPT_END
 };
 
 static void
 mount_run(const char *mount_args)
 {
-	int err;
-
-	char *mount_prog_path;
-	char *mount_cmd;
-
-	mount_prog_path = fuse_resource_path(OSXFUSE_MOUNT_PROG);
-	if (!mount_prog_path) {
-		fprintf(stderr, "fuse: mount program missing\n");
-		goto out;
-	}
-	err = asprintf(&mount_cmd, "%s %s", mount_prog_path, mount_args);
-	free(mount_prog_path);
-	if (err == -1) {
-		goto out;
-	}
-
-	system(mount_cmd);
-
-out:
-	free(mount_cmd);
 }
 
 static void
@@ -256,7 +243,9 @@ fuse_mount_opt_proc(void *data, const char *arg, int key,
 		case KEY_QUIET:
 			quiet_mode = 1;
 			return 0;
-
+		case KEY_DEBUG:
+			debug_mode = 1;
+			break;
 		case KEY_HELP:
 			mount_help();
 			mo->ishelp = 1;
@@ -270,40 +259,14 @@ fuse_mount_opt_proc(void *data, const char *arg, int key,
 	return 1;
 }
 
-void
-fuse_kern_unmount(DADiskRef disk, int fd)
+
+void fuse_kern_unmount(const char *mountpoint, int fd)
 {
-	struct stat sbuf;
-	char dev[128];
-	char *ep, *rp = NULL, *umount_cmd;
-
-	if (!disk) {
-		/*
-		 * Filesystem has already been unmounted, all we need to do is
-		 * make sure fd is closed.
-		 */
-		if (fd != -1)
-			close(fd);
-		return;
+	if (fd > 0) {
+		char unmount_cmd[] = "unmount";
+		send(fd, unmount_cmd, strlen(unmount_cmd), 0);
+		close(fd);
 	}
-
-	if (fstat(fd, &sbuf) == -1) {
-		return;
-	}
-
-	devname_r(sbuf.st_rdev, S_IFCHR, dev, 128);
-
-	if (strncmp(dev, OSXFUSE_DEVICE_BASENAME,
-		    sizeof(OSXFUSE_DEVICE_BASENAME) - 1)) {
-		return;
-	}
-
-	strtol(dev + sizeof(OSXFUSE_DEVICE_BASENAME) - 1, &ep, 10);
-	if (*ep != '\0') {
-		return;
-	}
-
-	DADiskUnmount(disk, kDADiskUnmountOptionDefault, NULL, NULL);
 }
 
 void
@@ -360,7 +323,7 @@ static int receive_fd(int sock_fd)
 
 struct fuse_mount_core_wait_arg {
 	int fd;
-	void (*callback)(void *context, int res);
+	void (*callback)(void *context, int res, int fd);
 	void *context;
 };
 
@@ -368,8 +331,9 @@ static void *
 fuse_mount_core_wait(void *arg)
 {
 	int fd;
-	void (*callback)(void *context, int res);
+	void (*callback)(void *context, int res, int mod_fd);
 	void *context;
+	char mount_cmd[] = "mount";
 
 	int32_t status = -1;
 	ssize_t rv = 0;
@@ -386,6 +350,12 @@ fuse_mount_core_wait(void *arg)
 		goto out;
 	}
 
+	rv = send(fd, mount_cmd, strlen(mount_cmd), 0);
+	if (rv != strlen(mount_cmd)) {
+		perror("send mount command");
+		goto out;
+	}
+
 	while (((rv = recv(fd, &status, sizeof(status), 0)) == -1) &&
 	       errno == EINTR);
 	if (rv == -1) {
@@ -397,7 +367,7 @@ fuse_mount_core_wait(void *arg)
 		goto out;
 	}
 
-	callback(context, status);
+	callback(context, status, fd);
 
 out:
 	free(arg);
@@ -405,50 +375,17 @@ out:
 }
 
 static int
-fuse_mount_core(const char *mountpoint, const char *opts,
-		void (*callback)(void *, int), void *context)
+fuse_mount_core(const char *mountpoint, struct mount_opts *mopts,
+		void (*callback)(void *, int, int), void *context)
 {
 	int fd;
 	int result;
 	char *dev;
 	char *mount_prog_path;
 	int fds[2];
+	int mon_fds[2];
 	pid_t pid;
 	int status;
-
-
-
-	int sockfd, connfd;
-    struct sockaddr_in servaddr, cli;
-   
-    // socket create and verification
-    sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if (sockfd == -1) {
-        fprintf(stderr, "socket creation failed...\n");
-        return -1;
-    }
-    bzero(&servaddr, sizeof(servaddr));
-   
-    // assign IP, PORT
-    servaddr.sin_family = AF_INET;
-    servaddr.sin_addr.s_addr = inet_addr("127.0.0.1");
-    servaddr.sin_port = htons(8080);
-
-	const int enable = 1;
-	if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0) {
-    	fprintf(stderr, "setsockopt(SO_REUSEADDR) failed");
-		return -1;
-	}
-   
-    // connect the client socket to server socket
-    if (connect(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) != 0) {
-        fprintf(stderr, "connection with the server failed...\n");
-        return -1;
-    }
-
-	//callback(context, 0);
-	return sockfd;
-
 
 	if (!mountpoint) {
 		fprintf(stderr, "missing or invalid mount point\n");
@@ -457,11 +394,7 @@ fuse_mount_core(const char *mountpoint, const char *opts,
 
 	signal(SIGCHLD, SIG_DFL); /* So that we can wait4() below. */
 
-	if (getenv("FUSE_NO_MOUNT") || ! mountpoint) {
-		goto out;
-	}
-
-	mount_prog_path = fuse_resource_path(OSXFUSE_MOUNT_PROG);
+	mount_prog_path = fuse_resource_path(FUSE_NFSSRV_PROG);
 	if (!mount_prog_path) {
 		fprintf(stderr, "fuse: mount program missing\n");
 		return -1;
@@ -472,72 +405,77 @@ fuse_mount_core(const char *mountpoint, const char *opts,
 		fprintf(stderr, "fuse: socketpair() failed");
 		return -1;
 	}
+	result = socketpair(AF_UNIX, SOCK_STREAM, 0, mon_fds);
+	if (result == -1) {
+		fprintf(stderr, "fuse: socketpair() failed");
+		return -1;
+	}
+		
+	pid_t cpid = fork();
 
-	pid = fork();
-
-	if (pid == -1) {
+	if (cpid == -1) {
 		perror("fuse: fork failed");
 		close(fds[0]);
 		close(fds[1]);
-		return -1;
+		close(mon_fds[0]);
+		close(mon_fds[1]);
+		_exit(1);
 	}
 
-	if (pid == 0) {
-		pid_t cpid = fork();
+	if (cpid == 0) {
+		char daemon_path[PROC_PIDPATHINFO_MAXSIZE];
+		char commfd[10];
 
-		if (cpid == -1) {
-			perror("fuse: fork failed");
-			close(fds[0]);
-			close(fds[1]);
-			_exit(1);
+		const char *argv[32];
+		int a = 0;
+
+		close(fds[1]);
+		close(mon_fds[1]);
+
+		if (proc_pidpath(getpid(), daemon_path, PROC_PIDPATHINFO_MAXSIZE)) {
+			setenv("_FUSE_DAEMON_PATH", daemon_path, 1);
 		}
 
-		if (cpid == 0) {
-			char daemon_path[PROC_PIDPATHINFO_MAXSIZE];
-			char commfd[10];
+		snprintf(commfd, sizeof(commfd), "%i", fds[0]);
+		setenv("_FUSE_COMMFD", commfd, 1);
+		snprintf(commfd, sizeof(commfd), "%i", mon_fds[0]);
+		setenv("_FUSE_MONFD", commfd, 1);
+		setenv("_FUSE_COMMVERS", "2", 1);
 
-			const char *argv[32];
-			int a = 0;
-
-			close(fds[1]);
-			fcntl(fds[0], F_SETFD, 0);
-
-			if (proc_pidpath(getpid(), daemon_path, PROC_PIDPATHINFO_MAXSIZE)) {
-				setenv("_FUSE_DAEMON_PATH", daemon_path, 1);
-			}
-
-			snprintf(commfd, sizeof(commfd), "%i", fds[0]);
-			setenv("_FUSE_COMMFD", commfd, 1);
-			setenv("_FUSE_COMMVERS", "2", 1);
-
-			argv[a++] = mount_prog_path;
-			if (opts) {
-				argv[a++] = "-o";
-				argv[a++] = opts;
-			}
-			if (quiet_mode) {
-				argv[a++] = "-q";
-			}
-			argv[a++] = mountpoint;
-			argv[a++] = NULL;
-
-			execv(mount_prog_path, (char **)argv);
-			perror("fuse: failed to exec mount program");
-			_exit(1);
+		argv[a++] = mount_prog_path;
+		if (mopts->listen_addr) {
+			argv[a++] = "-l";
+			argv[a++] = mopts->listen_addr;
 		}
+		if (debug_mode) {
+			argv[a++] = "-d";
+		}
+		if (mopts->volname) {
+			argv[a++] = "--volname";
+			argv[a++] = mopts->volname;
+		}
+		argv[a++] = mountpoint;
+		argv[a++] = NULL;
 
-		_exit(0);
+		execv(mount_prog_path, (char **)argv);
+		perror("fuse: failed to exec mount program");
+		_exit(1);
 	}
 
 	free(mount_prog_path);
 
 	close(fds[0]);
-	fd = receive_fd(fds[1]);
+	close(mon_fds[0]);
+	fd = fds[1];
+
+	if (getenv("FUSE_NO_MOUNT")) {
+		goto out;
+	}
 
 	if (callback) {
 		struct fuse_mount_core_wait_arg *arg =
 			calloc(1, sizeof(struct fuse_mount_core_wait_arg));
-		arg->fd = fds[1];
+		arg->fd = mon_fds[1];
 		arg->callback = callback;
 		arg->context = context;
 
@@ -549,16 +487,11 @@ fuse_mount_core(const char *mountpoint, const char *opts,
 			goto mount_err_out;
 		}
 	}
-
-	if (waitpid(pid, &status, 0) == -1 || WEXITSTATUS(status) != 0) {
-		perror("fuse: failed to mount file system");
-		goto mount_err_out;
-	}
-
 	goto out;
 
 mount_err_out:
 	close(fd);
+	close(mon_fds[1]);
 	fd = -1;
 
 out:
@@ -567,7 +500,7 @@ out:
 
 int
 fuse_kern_mount(const char *mountpoint, struct fuse_args *args,
-		void (*callback)(void *, int), void *context)
+		void (*callback)(void *, int, int), void *context)
 {
 	struct mount_opts mo;
 	int res = -1;
@@ -662,7 +595,7 @@ fuse_kern_mount(const char *mountpoint, struct fuse_args *args,
 		}
 	}
 
-	res = fuse_mount_core(mountpoint, mo.kernel_opts, callback, context);
+	res = fuse_mount_core(mountpoint, &mo, callback, context);
 
 out:
 	free(mo.kernel_opts);

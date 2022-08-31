@@ -118,15 +118,16 @@ void fuse_kern_unmount_compat22(const char *mountpoint);
 int fuse_chan_clearfd(struct fuse_chan *ch);
 
 #ifdef __APPLE__
-void fuse_chan_set_disk(struct fuse_chan *ch, DADiskRef disk);
-void fuse_kern_unmount(DADiskRef disk, int fd);
+void fuse_kern_unmount(const char *mountpoint, int fd);
+void fuse_chan_set_monitor_fd(struct fuse_chan *ch, int mon_fd);
+int fuse_chan_monitor_fd(struct fuse_chan *ch);
 #else
 void fuse_kern_unmount(const char *mountpoint, int fd);
 #endif
 
 #ifdef __APPLE__
 int fuse_kern_mount(const char *mountpoint, struct fuse_args *args,
-		    void (*callback)(void *, int),
+		    void (*callback)(void *, int, int),
 		    void *context);
 #else
 int fuse_kern_mount(const char *mountpoint, struct fuse_args *args);

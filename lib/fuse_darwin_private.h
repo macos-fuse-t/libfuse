@@ -37,8 +37,8 @@ extern "C" {
 #  define OSXFUSE_DEVICE_BASENAME "macfuse"
 #endif
 
-#ifndef OSXFUSE_MOUNT_PROG
-#  define OSXFUSE_MOUNT_PROG "/Library/Filesystems/macfuse.fs/Contents/Resources/mount_macfuse"
+#ifndef FUSE_NFSSRV_PROG
+#  define FUSE_NFSSRV_PROG "/Library/Application Support/fuse-t/bin/go-nfsv4"
 #endif
 
 #ifndef OSXFUSE_VOLUME_ICON

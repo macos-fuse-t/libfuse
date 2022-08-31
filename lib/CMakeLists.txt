@@ -1,4 +1,4 @@
-add_library (fuse 
+add_library (fuse-t  SHARED
     buffer.c
     fuse_darwin.c
     fuse_loop_mt.c
@@ -19,8 +19,10 @@ add_library (fuse
     modules/volicon.c
 )
 
-add_definitions(-DPACKAGE_VERSION="1.0.0")
+set(LIBS "-liconv -framework CoreFoundation -framework DiskArbitration")
+
 add_definitions(-DFUSERMOUNT_DIR="/usr/local/bin")
 add_definitions(-D_FILE_OFFSET_BITS=64 -D_REENTRANT -DFUSE_USE_VERSION=26)
 
-target_include_directories (fuse PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../include)
+target_include_directories (fuse-t PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../include)
+target_link_libraries (fuse-t LINK_PUBLIC ${LIBS})

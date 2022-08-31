@@ -29,6 +29,7 @@ static void exit_handler(int sig)
 							      NULL);
 		if (ch)
 			fuse_unmount(NULL, ch);
+		fuse_session_exit(fuse_instance);
 #else
 		fuse_session_exit(fuse_instance);
 #endif

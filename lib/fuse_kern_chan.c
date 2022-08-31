@@ -25,9 +25,10 @@
 #include <assert.h>
  #include <sys/socket.h>
 
-pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+dispatch_queue_t recvQ;
+dispatch_queue_t sendQ;
 
-static int fuse_kern_chan_receive(struct fuse_chan **chp, char *buf,
+static int _fuse_kern_chan_receive(struct fuse_chan **chp, char *buf,
 				  size_t size)
 {
 	struct fuse_chan *ch = *chp;
@@ -37,8 +38,6 @@ static int fuse_kern_chan_receive(struct fuse_chan **chp, char *buf,
 	int state = 0;
 	assert(se != NULL);
 	int total = 0;
-
-	pthread_mutex_lock(&lock);
 
 	while (state < 2) {
 		// read header
@@ -58,7 +57,6 @@ static int fuse_kern_chan_receive(struct fuse_chan **chp, char *buf,
 		err = errno;
 
 		if (fuse_session_exited(se)) {
-			pthread_mutex_unlock(&lock);
 			return 0;
 		}
 		if (res == -1) {
@@ -69,29 +67,35 @@ static int fuse_kern_chan_receive(struct fuse_chan **chp, char *buf,
 
 			if (err == ENODEV) {
 				fuse_session_exit(se);
-				pthread_mutex_unlock(&lock);
 				return 0;
 			}
 			/* Errors occurring during normal operation: EINTR (read
 			interrupted), EAGAIN (nonblocking I/O), ENODEV (filesystem
 			umounted) */
 			if (err != EINTR && err != EAGAIN)
-				perror("fuse: reading device: %d");
-			pthread_mutex_unlock(&lock);
+				perror("fuse: reading error");
 			return -err;
 		}
 		if (res < len) {
 			fprintf(stderr, "short read on fuse device\n");
-			pthread_mutex_unlock(&lock);
 			return -EIO;
 		}
 	}
 
-	pthread_mutex_unlock(&lock);
 	return total;
 }
 
-static int fuse_kern_chan_send(struct fuse_chan *ch, const struct iovec iov[],
+static int fuse_kern_chan_receive(struct fuse_chan **chp, char *buf, size_t size)
+{
+	// since we use a regular socket, need to make sure all requests are serialized
+	__block int res;
+	dispatch_sync(recvQ, ^{
+		res = _fuse_kern_chan_receive(chp, buf,size);
+	});
+	return res;
+}
+
+static int _fuse_kern_chan_send(struct fuse_chan *ch, const struct iovec iov[],
 			       size_t count)
 {
 	if (iov) {
@@ -105,11 +109,23 @@ static int fuse_kern_chan_send(struct fuse_chan *ch, const struct iovec iov[],
 
 			/* ENOENT means the operation was interrupted */
 			if (!fuse_session_exited(se) && err != ENOENT)
-				perror("fuse: writing device");
+				perror("fuse: writing error");
 			return -err;
 		}
 	}
 	return 0;
+}
+
+static int fuse_kern_chan_send(struct fuse_chan *ch, const struct iovec iov[],
+			       size_t count)
+{
+	// since we use a regular socket, need to make sure all requests are serialized
+	__block int res;
+
+	dispatch_sync(sendQ, ^{
+		res = _fuse_kern_chan_send(ch, iov, count);
+	});
+	return res;
 }
 
 static void fuse_kern_chan_destroy(struct fuse_chan *ch)
@@ -139,5 +155,9 @@ struct fuse_chan *fuse_kern_chan_new(int fd)
 	};
 	size_t bufsize = sysconf(_SC_PAGESIZE) + 0x1000;
 	bufsize = bufsize < MIN_BUFSIZE ? MIN_BUFSIZE : bufsize;
+
+	recvQ = dispatch_queue_create("recvQ", DISPATCH_QUEUE_SERIAL);
+	sendQ = dispatch_queue_create("sendQ", DISPATCH_QUEUE_SERIAL);
+
 	return fuse_chan_new(&op, fd, bufsize, NULL);
 }

@@ -37,7 +37,8 @@ struct fuse_chan {
 	int fd;
 
 #ifdef __APPLE__
-	DADiskRef disk;
+	char *mountpoint;
+	int mon_fd;
 #endif
 
 	size_t bufsize;
@@ -195,23 +196,14 @@ struct fuse_chan *fuse_chan_new_compat24(struct fuse_chan_ops_compat24 *op,
 
 #ifdef __APPLE__
 
-DADiskRef fuse_chan_disk(struct fuse_chan *ch)
+int fuse_chan_monitor_fd(struct fuse_chan *ch)
 {
-	return ch->disk;
+	return ch->mon_fd;
 }
 
-void fuse_chan_set_disk(struct fuse_chan *ch, DADiskRef disk)
+void fuse_chan_set_monitor_fd(struct fuse_chan *ch, int mon_fd)
 {
-	if (ch->disk)
-		CFRelease(ch->disk);
-	if (disk)
-		CFRetain(disk);
-	ch->disk = disk;
-}
-
-void fuse_chan_cleardisk(struct fuse_chan *ch)
-{
-	fuse_chan_set_disk(ch, NULL);
+	ch->mon_fd = mon_fd;
 }
 
 #endif /* __APPLE__ */
@@ -272,8 +264,8 @@ void fuse_chan_destroy(struct fuse_chan *ch)
 	if (ch->op.destroy)
 		ch->op.destroy(ch);
 #ifdef __APPLE__
-	if (ch->disk)
-		CFRelease(ch->disk);
+	if (ch->mountpoint)
+		free(ch->mountpoint);
 #endif
 	free(ch);
 }

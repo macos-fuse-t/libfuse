@@ -254,7 +254,7 @@ struct fuse_mount_common_context {
 	char mountpoint[MAXPATHLEN];
 };
 
-static void fuse_mount_common_callback(void *context, int status)
+static void fuse_mount_common_callback(void *context, int status, int mon_fd)
 {
 	struct fuse_chan *ch;
 	char *mountpoint;
@@ -264,23 +264,11 @@ static void fuse_mount_common_callback(void *context, int status)
 			(struct fuse_mount_common_context *)context;
 		ch = c->ch;
 		mountpoint = c->mountpoint;
+		fuse_chan_set_monitor_fd(ch, mon_fd);
 	}
 
-	if (status == 0) {
-		CFURLRef url = CFURLCreateFromFileSystemRepresentation(
-			NULL, (const UInt8 *)mountpoint, strlen(mountpoint),
-			TRUE);
-		DADiskRef disk = DADiskCreateFromVolumePath(
-			NULL, fuse_dasession, url);
-
-		fuse_chan_set_disk(ch, disk);
-
-		if (disk)
-			CFRelease(disk);
-		CFRelease(url);
-	} else {
+	if (status)
 		fprintf(stderr, "fuse: mount failed with errro: %d\n", status);
-	}
 
 out:
 	free(context);
@@ -340,27 +328,15 @@ struct fuse_chan *fuse_mount(const char *mountpoint, struct fuse_args *args)
 static void fuse_unmount_common(const char *mountpoint, struct fuse_chan *ch)
 {	
 #ifdef __APPLE__
-	int fd = ch ? fuse_chan_fd(ch) : -1;
-	DADiskRef disk = NULL;
+	if (ch) {
+		fuse_kern_unmount(mountpoint, fuse_chan_monitor_fd(ch));
+		fuse_chan_set_monitor_fd(ch, -1);
 
-	if (mountpoint) {
-		CFURLRef url = CFURLCreateFromFileSystemRepresentation(
-			NULL, (const UInt8 *)mountpoint, strlen(mountpoint),
-			TRUE);
-		disk = DADiskCreateFromVolumePath(NULL, fuse_dasession, url);
-		CFRelease(url);
-	} else if (ch) {
-		disk = fuse_chan_disk(ch);
-		if (disk)
-			CFRetain(disk);
+		int fd = fuse_chan_clearfd(ch);
+		if (fd > 0)
+			close(fd);
 	}
 
-	fuse_kern_unmount(disk, fd);
-
-	if (disk)
-		CFRelease(disk);
-	else if (ch)
-		fuse_chan_destroy(ch);
 #else /* __APPLE__ */
 	if (mountpoint) {
 		int fd = ch ? fuse_chan_clearfd(ch) : -1;
