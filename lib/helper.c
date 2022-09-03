@@ -297,6 +297,10 @@ static struct fuse_chan *fuse_mount_common(const char *mountpoint,
 	} while (fd >= 0 && fd <= 2);
 
 #ifdef __APPLE__
+	if (!mountpoint) {
+		fprintf(stderr, "no mount point given\n");
+		return NULL;
+	}
 	context = calloc(1, sizeof(struct fuse_mount_common_context));
 	strncpy(context->mountpoint, mountpoint,
 		sizeof(context->mountpoint) - 1);
