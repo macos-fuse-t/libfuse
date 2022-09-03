@@ -64,6 +64,7 @@ struct mount_opts {
 	char *volicon;
 	char *volname;
 	char *listen_addr;
+	int read_only;
 };
 
 static const struct fuse_opt fuse_mount_opts[] = {
@@ -226,6 +227,7 @@ fuse_mount_opt_proc(void *data, const char *arg, int key,
 
 		case KEY_RO:
 			arg = "ro";
+			mo->read_only = 1;
 			/* fall through */
 
 		case KEY_KERN:
@@ -458,6 +460,10 @@ fuse_mount_core(const char *mountpoint, struct mount_opts *mopts,
 			argv[a++] = "--volname";
 			argv[a++] = mopts->volname;
 		}
+		if (mopts->read_only) {
+			argv[a++] = "-r";
+		}
+
 		argv[a++] = mountpoint;
 		argv[a++] = NULL;
 
