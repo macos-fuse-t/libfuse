@@ -386,6 +386,7 @@ fuse_mount_core(const char *mountpoint, struct mount_opts *mopts,
 	int mon_fds[2];
 	pid_t pid;
 	int status;
+	char *srv_path;
 
 	if (!mountpoint) {
 		fprintf(stderr, "missing or invalid mount point\n");
@@ -394,7 +395,10 @@ fuse_mount_core(const char *mountpoint, struct mount_opts *mopts,
 
 	signal(SIGCHLD, SIG_DFL); /* So that we can wait4() below. */
 
-	mount_prog_path = fuse_resource_path(FUSE_NFSSRV_PROG);
+	srv_path = getenv("FUSE_NFSSRV_PATH");
+	if (!srv_path)
+		srv_path = FUSE_NFSSRV_PROG;
+	mount_prog_path = fuse_resource_path(srv_path);
 	if (!mount_prog_path) {
 		fprintf(stderr, "fuse: mount program missing\n");
 		return -1;

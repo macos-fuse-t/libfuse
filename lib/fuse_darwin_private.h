@@ -38,7 +38,7 @@ extern "C" {
 #endif
 
 #ifndef FUSE_NFSSRV_PROG
-#  define FUSE_NFSSRV_PROG "/Library/Application Support/fuse-t/bin/go-nfsv4"
+#  define FUSE_NFSSRV_PROG "/usr/local/bin/go-nfsv4"
 #endif
 
 #ifndef OSXFUSE_VOLUME_ICON
