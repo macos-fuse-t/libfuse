@@ -1,3 +1,5 @@
+set(CMAKE_OSX_ARCHITECTURES arm64;x86_64)
+
 add_executable (hello hello.c)
 add_executable (hello_ll hello_ll.c)
 add_executable (cusexmp cusexmp.c)
