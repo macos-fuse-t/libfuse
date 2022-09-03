@@ -1,24 +1,12 @@
 libfuse
 =======
+This repo was forked from https://github.com/osxfuse/fuse
 
-Warning: unresolved security issue
-----------------------------------
-
-Be aware that FUSE has an unresolved security bug
-([bug #15](https://github.com/libfuse/libfuse/issues/15)): the
-permission check for accessing a cached directory is only done once
-when the directory entry is first loaded into the cache. Subsequent
-accesses will re-use the results of the first check, even if the
-directory permissions have since changed, and even if the subsequent
-access is made by a different user.
-
-This bug needs to be fixed in the Linux kernel and has been known
-since 2006 but unfortunately no fix has been applied yet. If you
-depend on correct permission handling for FUSE file systems, the only
-workaround is to completely disable caching of directory
-entries. Alternatively, the severity of the bug can be somewhat
-reduced by not using the `allow_other` mount option.
-
+The following changes were made to the original project:
+1. Build system changed to cmake
+2. Only relevant sources included
+3. Necessary code changes to replace the kernel driver backend 
+with NFS server
 
 About
 -----
@@ -46,40 +34,10 @@ explicitly using a separate set of API functions.
 Installation
 ------------
 
-    ./configure
-    make -j8
-    make install
-
-You may also need to add `/usr/local/lib` to `/etc/ld.so.conf` and/or
-run *ldconfig*. If you're building from the git repository (instead of
-using a release tarball), you also need to run `./makeconf.sh` to
-create the `configure` script.
-
-You'll also need a fuse kernel module (Linux kernels 2.6.14 or later
-contain FUSE support).
-
-For more details see the file `INSTALL`
-
-Security implications
----------------------
-
-If you run `make install`, the *fusermount* program is installed
-set-user-id to root.  This is done to allow normal users to mount
-their own filesystem implementations.
-
-There must however be some limitations, in order to prevent Bad User from
-doing nasty things.  Currently those limitations are:
-
-  - The user can only mount on a mountpoint, for which it has write
-    permission
-
-  - The mountpoint is not a sticky directory which isn't owned by the
-    user (like /tmp usually is)
-
-  - No other user (including root) can access the contents of the
-    mounted filesystem (though this can be relaxed by allowing the use
-    of the `allow_other` and `allow_root` mount options in `fuse.conf`)
-
+    mkdir build
+    cd build
+    cmake ..
+    make
 
 Building your own filesystem
 ------------------------------
