@@ -1,6 +1,6 @@
 set(CMAKE_OSX_ARCHITECTURES arm64;x86_64)
 
-add_library (fuse-t  SHARED
+add_library (fuse-t SHARED STATIC
     buffer.c
     fuse_darwin.c
     fuse_loop_mt.c
