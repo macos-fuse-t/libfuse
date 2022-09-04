@@ -267,8 +267,11 @@ static void fuse_mount_common_callback(void *context, int status, int mon_fd)
 		fuse_chan_set_monitor_fd(ch, mon_fd);
 	}
 
-	if (status)
+	if (status) {
 		fprintf(stderr, "fuse: mount failed with errro: %d\n", status);
+		fuse_chan_destroy(ch);
+		exit(-1);
+	}
 
 out:
 	free(context);
