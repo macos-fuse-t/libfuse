@@ -5456,6 +5456,7 @@ struct fuse *fuse_new_common(struct fuse_chan *ch, struct fuse_args *args,
 		goto out_free_fs;
 
 #ifdef __APPLE__
+/*
 	if (!f->conf.iconpath) {
 		char *iconpath = fuse_resource_path(OSXFUSE_VOLUME_ICON);
 		struct stat stbuf;
@@ -5505,6 +5506,7 @@ struct fuse *fuse_new_common(struct fuse_chan *ch, struct fuse_args *args,
 			goto out_free_fs;
 		}
 	}
+*/
 #endif /* __APPLE__ */
 
 	if (f->conf.modules) {
