@@ -13,6 +13,7 @@ add_executable (null null.c)
 
 add_definitions(-D_FILE_OFFSET_BITS=64 -D_REENTRANT)
 
+include_directories (${CMAKE_CURRENT_SOURCE_DIR}/../include)
 set(LIBS "-liconv -framework CoreFoundation -framework DiskArbitration")
 
 target_link_libraries (hello LINK_PUBLIC fuse-t ${LIBS})
