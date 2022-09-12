@@ -170,8 +170,9 @@ static int xmp_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 		memset(&st, 0, sizeof(st));
 		st.st_ino = d->entry->d_ino;
 		st.st_mode = d->entry->d_type << 12;
-		nextoff = 0;//telldir(d->dp);
-		if (filler(buf, d->entry->d_name, &st, nextoff))
+		nextoff = telldir(d->dp);
+		nextoff++;
+		if (filler(buf, d->entry->d_name, &st, /*nextoff*/0))
 			break;
 
 		d->entry = NULL;
