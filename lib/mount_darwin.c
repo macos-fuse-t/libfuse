@@ -53,6 +53,7 @@ enum {
 	KEY_RO,
 	KEY_VERSION,
 	KEY_DEBUG,
+	KEY_NONAMEDATTR,
 };
 
 struct mount_opts {
@@ -65,6 +66,7 @@ struct mount_opts {
 	char *volname;
 	char *listen_addr;
 	int read_only;
+	int nonamedattr;
 };
 
 static const struct fuse_opt fuse_mount_opts[] = {
@@ -184,6 +186,7 @@ static const struct fuse_opt fuse_mount_opts[] = {
 	FUSE_OPT_KEY("debug",		      KEY_DEBUG),
 	FUSE_OPT_KEY("-d",		     	  KEY_DEBUG),
 	{ "listen_addr=%s", offsetof(struct mount_opts, listen_addr), 0 },
+	FUSE_OPT_KEY("nonamedattr",	      KEY_NONAMEDATTR),
 	FUSE_OPT_END
 };
 
@@ -257,6 +260,10 @@ fuse_mount_opt_proc(void *data, const char *arg, int key,
 			mount_version();
 			mo->ishelp = 1;
 			break;
+		case KEY_NONAMEDATTR:
+			mo->nonamedattr = 1;
+			return 0;
+
 	}
 	return 1;
 }
@@ -462,6 +469,9 @@ fuse_mount_core(const char *mountpoint, struct mount_opts *mopts,
 		}
 		if (mopts->read_only) {
 			argv[a++] = "-r";
+		}
+		if (mopts->nonamedattr) {
+			argv[a++] = "--namedattr=false";
 		}
 
 		argv[a++] = mountpoint;
