@@ -48,7 +48,13 @@ static int _fuse_kern_chan_receive(struct fuse_chan **chp, char *buf,
 			struct fuse_in_header *hdr = (struct fuse_in_header *)buf;
 			len = hdr->len - sizeof(struct fuse_in_header);
 		}
-		res = recv(fuse_chan_fd(ch), buf + total, len, MSG_WAITALL);
+again:
+		res = recv(fuse_chan_fd(ch), buf + total, len, 0);
+		if (res > 0 && res < len) {
+			total += res;
+			len -= res;
+			goto again;
+		}
 		if (res == len) {
 			state++;
 			total += res;
