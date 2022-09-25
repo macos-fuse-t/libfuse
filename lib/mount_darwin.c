@@ -54,6 +54,7 @@ enum {
 	KEY_VERSION,
 	KEY_DEBUG,
 	KEY_NONAMEDATTR,
+	KEY_NOATTRCACHE,
 };
 
 struct mount_opts {
@@ -67,6 +68,7 @@ struct mount_opts {
 	char *listen_addr;
 	int read_only;
 	int nonamedattr;
+	int noattrcache;
 };
 
 static const struct fuse_opt fuse_mount_opts[] = {
@@ -102,7 +104,7 @@ static const struct fuse_opt fuse_mount_opts[] = {
 	FUSE_OPT_KEY("acls",		      KEY_KERN),
 	FUSE_OPT_KEY("force",		      KEY_KERN),
 	FUSE_OPT_KEY("update",		      KEY_KERN),
-	FUSE_OPT_KEY("ro",		      KEY_KERN),
+	FUSE_OPT_KEY("ro",		      KEY_RO),
 	FUSE_OPT_KEY("rw",		      KEY_KERN),
 	FUSE_OPT_KEY("auto",		      KEY_KERN),
 	/* options supported under both Linux and FBSD */
@@ -167,7 +169,7 @@ static const struct fuse_opt fuse_mount_opts[] = {
 	FUSE_OPT_KEY("noalerts",	      KEY_KERN),
 	FUSE_OPT_KEY("noappledouble",	      KEY_KERN),
 	FUSE_OPT_KEY("noapplexattr",	      KEY_KERN),
-	FUSE_OPT_KEY("noattrcache",	      KEY_KERN),
+	FUSE_OPT_KEY("noattrcache",	      KEY_NOATTRCACHE),
 	FUSE_OPT_KEY("noautonotify",	      KEY_KERN),
 	FUSE_OPT_KEY("nobrowse",	      KEY_KERN),
 	FUSE_OPT_KEY("nolocalcaches",	      KEY_KERN),
@@ -263,7 +265,9 @@ fuse_mount_opt_proc(void *data, const char *arg, int key,
 		case KEY_NONAMEDATTR:
 			mo->nonamedattr = 1;
 			return 0;
-
+		case KEY_NOATTRCACHE:
+			mo->noattrcache = 1;
+			return 0;
 	}
 	return 1;
 }
@@ -472,6 +476,9 @@ fuse_mount_core(const char *mountpoint, struct mount_opts *mopts,
 		}
 		if (mopts->nonamedattr) {
 			argv[a++] = "--namedattr=false";
+		}
+		if (mopts->noattrcache) {
+			argv[a++] = "--attrcache=false";
 		}
 
 		argv[a++] = mountpoint;
