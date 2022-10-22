@@ -400,6 +400,7 @@ fuse_mount_core(const char *mountpoint, struct mount_opts *mopts,
 	pid_t pid;
 	int status;
 	char *srv_path;
+	int sndsize = 4*1024*1024;
 
 	if (!mountpoint) {
 		fprintf(stderr, "missing or invalid mount point\n");
@@ -422,6 +423,13 @@ fuse_mount_core(const char *mountpoint, struct mount_opts *mopts,
 		fprintf(stderr, "fuse: socketpair() failed");
 		return -1;
 	}
+
+	setsockopt(fds[0], SOL_SOCKET, SO_RCVBUF, &sndsize, sizeof(sndsize));
+	setsockopt(fds[0], SOL_SOCKET, SO_SNDBUF, &sndsize, sizeof(sndsize));
+	setsockopt(fds[1], SOL_SOCKET, SO_RCVBUF, &sndsize, sizeof(sndsize));
+	setsockopt(fds[1], SOL_SOCKET, SO_SNDBUF, &sndsize, sizeof(sndsize));
+
+
 	result = socketpair(AF_UNIX, SOCK_STREAM, 0, mon_fds);
 	if (result == -1) {
 		fprintf(stderr, "fuse: socketpair() failed");
@@ -514,6 +522,7 @@ fuse_mount_core(const char *mountpoint, struct mount_opts *mopts,
 			goto mount_err_out;
 		}
 	}
+
 	goto out;
 
 mount_err_out:
