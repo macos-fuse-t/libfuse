@@ -69,6 +69,7 @@ struct mount_opts {
 	int read_only;
 	int nonamedattr;
 	int noattrcache;
+	int rwsize;
 };
 
 static const struct fuse_opt fuse_mount_opts[] = {
@@ -189,6 +190,7 @@ static const struct fuse_opt fuse_mount_opts[] = {
 	FUSE_OPT_KEY("-d",		     	  KEY_DEBUG),
 	{ "listen_addr=%s", offsetof(struct mount_opts, listen_addr), 0 },
 	FUSE_OPT_KEY("nonamedattr",	      KEY_NONAMEDATTR),
+	{ "rwsize=%d", offsetof(struct mount_opts, rwsize), 0 },
 	FUSE_OPT_END
 };
 
@@ -450,6 +452,7 @@ fuse_mount_core(const char *mountpoint, struct mount_opts *mopts,
 	if (cpid == 0) {
 		char daemon_path[PROC_PIDPATHINFO_MAXSIZE];
 		char commfd[10];
+		char rwsize_str[64];
 
 		const char *argv[32];
 		int a = 0;
@@ -487,6 +490,10 @@ fuse_mount_core(const char *mountpoint, struct mount_opts *mopts,
 		}
 		if (mopts->noattrcache) {
 			argv[a++] = "--attrcache=false";
+		}
+		if (mopts->rwsize) {
+			sprintf(rwsize_str, "--rwsize=%d", mopts->rwsize);
+			argv[a++] = rwsize_str;
 		}
 
 		argv[a++] = mountpoint;
