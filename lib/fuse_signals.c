@@ -25,11 +25,11 @@ static void exit_handler(int sig)
 
 	if (fuse_instance) {
 #ifdef __APPLE__
+		fuse_session_exit(fuse_instance);
 		struct fuse_chan *ch = fuse_session_next_chan(fuse_instance,
 							      NULL);
 		if (ch)
 			fuse_unmount(NULL, ch);
-		fuse_session_exit(fuse_instance);
 #else
 		fuse_session_exit(fuse_instance);
 #endif
