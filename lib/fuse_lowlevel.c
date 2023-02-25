@@ -14,6 +14,7 @@
 #define _GNU_SOURCE
 
 #include "config.h"
+#undef _POSIX_C_SOURCE
 #include "fuse_i.h"
 #include "fuse_kernel.h"
 #include "fuse_opt.h"
@@ -87,7 +88,7 @@ static void convert_stat(const struct stat *stbuf, struct fuse_attr *attr)
 	attr->flags	= stbuf->st_flags;
 #ifdef _DARWIN_FEATURE_64_BIT_INODE
 	attr->crtime	= stbuf->st_birthtime;
-	attr->crtimensec= (uint32_t)(stbuf->st_birthtimensec);
+	attr->crtimensec= (uint32_t)(stbuf->st_birthtimespec.tv_nsec);
 #else
 	attr->crtime	= (__u64)-1;
 	attr->crtimensec= (__u32)-1;
@@ -133,7 +134,7 @@ static void convert_attr(const struct fuse_setattr_in *attr, struct stat *stbuf)
 	stbuf->st_flags = attr->flags;
 
 	stbuf->st_ctime = attr->chgtime;
-	stbuf->st_ctimensec = attr->chgtimensec;
+	stbuf->st_ctimespec.tv_nsec = attr->chgtimensec;
 
 	/* XXX: aaaaaaaaaaaargh */
 	stbuf->st_qspare[0] = attr->bkuptime;

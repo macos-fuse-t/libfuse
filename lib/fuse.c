@@ -15,6 +15,7 @@
 
 /* For pthread_rwlock_t */
 #define _GNU_SOURCE
+#define _POSIX_SOURCE
 
 #include "config.h"
 #include "fuse_i.h"
@@ -3337,7 +3338,7 @@ static void fuse_lib_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 		if (!err && (valid & FUSE_SET_ATTR_CHGTIME)) {
 			struct timespec tv;
 			tv.tv_sec = (uint64_t)(attr->st_ctime);
-			tv.tv_nsec = (uint32_t)(attr->st_ctimensec);
+			tv.tv_nsec = (uint32_t)ST_CTIM_NSEC(attr);
 			err = fuse_fs_setchgtime(f->fs, path, &tv);
 		}
 		if (!err && (valid & FUSE_SET_ATTR_CRTIME)) {

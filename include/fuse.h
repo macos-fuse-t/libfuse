@@ -29,7 +29,6 @@
 #endif
 
 #include "fuse_common.h"
-
 #include <fcntl.h>
 #include <time.h>
 #include <utime.h>

@@ -44,7 +44,7 @@
 /* #undef HAVE_STRUCT_STAT_ST_ATIM */
 
 /* Define to 1 if `st_atimensec' is a member of `struct stat'. */
-#define HAVE_STRUCT_STAT_ST_ATIMENSEC 1
+//#define HAVE_STRUCT_STAT_ST_ATIMENSEC 1
 
 /* Define to 1 if `st_atimespec' is a member of `struct stat'. */
 /* #undef HAVE_STRUCT_STAT_ST_ATIMESPEC */
