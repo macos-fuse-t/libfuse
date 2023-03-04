@@ -25,8 +25,10 @@
 #include <assert.h>
 #include <sys/socket.h>
 
-dispatch_queue_t recvQ;
-dispatch_queue_t sendQ;
+struct _kern_data {
+	dispatch_queue_t sendQ;
+	dispatch_queue_t recvQ;
+};
 
 static int _fuse_kern_chan_receive(struct fuse_chan **chp, char *buf,
 				  size_t size)
@@ -97,7 +99,8 @@ static int fuse_kern_chan_receive(struct fuse_chan **chp, char *buf, size_t size
 {
 	// since we use a regular socket, need to make sure all requests are serialized
 	__block int res;
-	dispatch_sync(recvQ, ^{
+	struct _kern_data *data = (struct _kern_data *)fuse_chan_data(*chp);
+	dispatch_sync(data->recvQ, ^{
 		res = _fuse_kern_chan_receive(chp, buf,size);
 	});
 	return res;
@@ -129,8 +132,9 @@ static int fuse_kern_chan_send(struct fuse_chan *ch, const struct iovec iov[],
 {
 	// since we use a regular socket, need to make sure all requests are serialized
 	__block int res;
+	struct _kern_data *data = (struct _kern_data *)fuse_chan_data(ch);
 
-	dispatch_sync(sendQ, ^{
+	dispatch_sync(data->sendQ, ^{
 		res = _fuse_kern_chan_send(ch, iov, count);
 	});
 	return res;
@@ -146,6 +150,10 @@ static void fuse_kern_chan_destroy(struct fuse_chan *ch)
 #endif
 		close(fd);
     }
+
+	struct _kern_data *data = (struct _kern_data *)fuse_chan_data(ch);
+	if (data)
+		free(data);
 }
 
 #ifdef __APPLE__
@@ -164,8 +172,9 @@ struct fuse_chan *fuse_kern_chan_new(int fd)
 	size_t bufsize = sysconf(_SC_PAGESIZE) + 0x1000;
 	bufsize = bufsize < MIN_BUFSIZE ? MIN_BUFSIZE : bufsize;
 
-	recvQ = dispatch_queue_create("recvQ", DISPATCH_QUEUE_SERIAL);
-	sendQ = dispatch_queue_create("sendQ", DISPATCH_QUEUE_SERIAL);
+	struct _kern_data *data = (struct _kern_data *)malloc(sizeof(*data));
+	data->recvQ = dispatch_queue_create("recvQ", DISPATCH_QUEUE_SERIAL);
+	data->sendQ = dispatch_queue_create("sendQ", DISPATCH_QUEUE_SERIAL);
 
-	return fuse_chan_new(&op, fd, bufsize, NULL);
+	return fuse_chan_new(&op, fd, bufsize, data);
 }
