@@ -252,7 +252,6 @@ static int xmp_symlink(const char *from, const char *to)
 static int xmp_rename(const char *from, const char *to)
 {
 	int res;
-
 	res = rename(from, to);
 	if (res == -1)
 		return -errno;

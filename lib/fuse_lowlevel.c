@@ -1301,7 +1301,7 @@ static void do_rename(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
 	 * Older versions of macFUSE implement ABI 7.19, but do not support
 	 * renamex_np(2). Check for FUSE_CAP_RENAME_SWAP.
 	 */
-	if (!(req->f->conn.capable & FUSE_CAP_RENAME_SWAP)) {
+	if (!(req->f->conn.want & FUSE_CAP_RENAME_SWAP)) {
 		oldname = ((char *) arg) + FUSE_COMPAT_RENAME_IN_SIZE;
 	} else
 #endif /* __APPLE__ */
@@ -1309,7 +1309,7 @@ static void do_rename(fuse_req_t req, fuse_ino_t nodeid, const void *inarg)
 	newname = oldname + strlen(oldname) + 1;
 
 #ifdef __APPLE__
-	if ((req->f->conn.capable & FUSE_CAP_RENAME_SWAP) && arg->flags != 0) {
+	if ((req->f->conn.want & FUSE_CAP_RENAME_SWAP) && arg->flags != 0) {
 		if (req->f->op.renamex)
 			req->f->op.renamex(req, nodeid, oldname, arg->newdir,
 					   newname, arg->flags);
