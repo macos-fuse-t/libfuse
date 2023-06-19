@@ -55,6 +55,8 @@ enum {
 	KEY_DEBUG,
 	KEY_NONAMEDATTR,
 	KEY_NOATTRCACHE,
+	KEY_NOBROWSE,
+	KEY_NFC,
 };
 
 struct mount_opts {
@@ -70,6 +72,8 @@ struct mount_opts {
 	int nonamedattr;
 	int noattrcache;
 	int rwsize;
+	int nobrowse;
+	int nfc;
 };
 
 static const struct fuse_opt fuse_mount_opts[] = {
@@ -172,7 +176,7 @@ static const struct fuse_opt fuse_mount_opts[] = {
 	FUSE_OPT_KEY("noapplexattr",	      KEY_KERN),
 	FUSE_OPT_KEY("noattrcache",	      KEY_NOATTRCACHE),
 	FUSE_OPT_KEY("noautonotify",	      KEY_KERN),
-	FUSE_OPT_KEY("nobrowse",	      KEY_KERN),
+	FUSE_OPT_KEY("nobrowse",	      KEY_NOBROWSE),
 	FUSE_OPT_KEY("nolocalcaches",	      KEY_KERN),
 	FUSE_OPT_KEY("noping_diskarb",	      KEY_IGNORED),
 	FUSE_OPT_KEY("noreadahead",	      KEY_KERN),
@@ -190,6 +194,7 @@ static const struct fuse_opt fuse_mount_opts[] = {
 	FUSE_OPT_KEY("-d",		     	  KEY_DEBUG),
 	{ "listen_addr=%s", offsetof(struct mount_opts, listen_addr), 0 },
 	FUSE_OPT_KEY("nonamedattr",	      KEY_NONAMEDATTR),
+	FUSE_OPT_KEY("nfc",	      		KEY_NFC),
 	{ "rwsize=%d", offsetof(struct mount_opts, rwsize), 0 },
 	FUSE_OPT_END
 };
@@ -269,6 +274,12 @@ fuse_mount_opt_proc(void *data, const char *arg, int key,
 			return 0;
 		case KEY_NOATTRCACHE:
 			mo->noattrcache = 1;
+			return 0;
+		case KEY_NOBROWSE:
+			mo->nobrowse = 1;
+			return 0;
+		case KEY_NFC:
+			mo->nfc = 1;
 			return 0;
 	}
 	return 1;
@@ -494,6 +505,12 @@ fuse_mount_core(const char *mountpoint, struct mount_opts *mopts,
 		if (mopts->rwsize) {
 			sprintf(rwsize_str, "--rwsize=%d", mopts->rwsize);
 			argv[a++] = rwsize_str;
+		}
+		if (mopts->nobrowse) {
+			argv[a++] = "--dontbrowse=true";
+		}
+		if (mopts->nfc) {
+			argv[a++] = "--nfc=true";
 		}
 
 		argv[a++] = mountpoint;
