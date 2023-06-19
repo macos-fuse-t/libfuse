@@ -38,7 +38,8 @@ static int _fuse_kern_chan_receive(struct fuse_chan **chp, char *buf,
 	ssize_t res;
 	struct fuse_session *se = fuse_chan_session(ch);
 	int state = 0;
-	assert(se != NULL);
+	if (!se)
+		return -1;
 	int total = 0;
 
 	while (state < 2) {
