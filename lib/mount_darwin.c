@@ -56,6 +56,8 @@ enum {
 	KEY_NONAMEDATTR,
 	KEY_NOATTRCACHE,
 	KEY_NOBROWSE,
+	KEY_NOATIME,
+	KEY_NOMTIME,
 	KEY_NFC,
 };
 
@@ -74,6 +76,9 @@ struct mount_opts {
 	int rwsize;
 	int nobrowse;
 	int nfc;
+	int noatime;
+	int nomtime;
+	char *location;
 };
 
 static const struct fuse_opt fuse_mount_opts[] = {
@@ -81,6 +86,7 @@ static const struct fuse_opt fuse_mount_opts[] = {
 	{ "allow_root", offsetof(struct mount_opts, allow_root), 1 },
 	{ "modules=%s", offsetof(struct mount_opts, modules), 0 },
 	{ "volname=%s", offsetof(struct mount_opts, volname), 0 },
+	{ "location=%s", offsetof(struct mount_opts, location), 0 },
 	FUSE_OPT_KEY("allow_root",	      KEY_ALLOW_ROOT),
 	FUSE_OPT_KEY("auto_cache",	      KEY_AUTO_CACHE),
 	FUSE_OPT_KEY("-r",		      KEY_RO),
@@ -196,6 +202,8 @@ static const struct fuse_opt fuse_mount_opts[] = {
 	FUSE_OPT_KEY("nonamedattr",	      KEY_NONAMEDATTR),
 	FUSE_OPT_KEY("nfc",	      		KEY_NFC),
 	{ "rwsize=%d", offsetof(struct mount_opts, rwsize), 0 },
+	FUSE_OPT_KEY("noatime",	      	KEY_NOATIME),
+	FUSE_OPT_KEY("nomtime",	      	KEY_NOMTIME),
 	FUSE_OPT_END
 };
 
@@ -280,6 +288,12 @@ fuse_mount_opt_proc(void *data, const char *arg, int key,
 			return 0;
 		case KEY_NFC:
 			mo->nfc = 1;
+			return 0;
+		case KEY_NOATIME:
+			mo->noatime = 1;
+			return 0;
+		case KEY_NOMTIME:
+			mo->nomtime = 1;
 			return 0;
 	}
 	return 1;
@@ -511,6 +525,16 @@ fuse_mount_core(const char *mountpoint, struct mount_opts *mopts,
 		}
 		if (mopts->nfc) {
 			argv[a++] = "--nfc=true";
+		}
+		if (mopts->noatime) {
+			argv[a++] = "--noatime=true";
+		}
+		if (mopts->nomtime) {
+			argv[a++] = "--nomtime=true";
+		}
+		if (mopts->location) {
+			argv[a++] = "--location";
+			argv[a++] = mopts->location;
 		}
 
 		argv[a++] = mountpoint;
