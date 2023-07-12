@@ -540,6 +540,12 @@ fuse_mount_core(const char *mountpoint, struct mount_opts *mopts,
 		argv[a++] = mountpoint;
 		argv[a++] = NULL;
 
+		// daemonize the server
+        setsid();
+        freopen("/dev/null", "r", stdin);
+        freopen("/dev/null", "w", stdout);
+        freopen("/dev/null", "w", stderr);
+
 		execv(mount_prog_path, (char **)argv);
 		perror("fuse: failed to exec mount program");
 		_exit(1);
