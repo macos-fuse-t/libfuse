@@ -195,12 +195,22 @@ err:
 	return -1;
 }
 
+pthread_mutex_t mount_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t mount_cond = PTHREAD_COND_INITIALIZER;
+
+
 int fuse_daemonize(int foreground)
 {
 	if (!foreground) {
 		int nullfd;
 		int waiter[2];
 		char completed;
+
+		struct timeval tv;
+        struct timespec ts;
+        gettimeofday(&tv, NULL);
+        ts.tv_sec = tv.tv_sec + 2;
+        ts.tv_nsec = 0;
 
 		if (pipe(waiter)) {
 			perror("fuse_daemonize: pipe");
@@ -219,6 +229,8 @@ int fuse_daemonize(int foreground)
 			break;
 		default:
 			read(waiter[0], &completed, sizeof(completed));
+			// wait for mount
+			pthread_cond_timedwait(&mount_cond, &mount_mutex, &ts);
 			_exit(0);
 		}
 
@@ -272,6 +284,11 @@ static void fuse_mount_common_callback(void *context, int status, int mon_fd)
 		fuse_chan_destroy(ch);
 		//exit(-1);
 	}
+
+	// signal mount completed
+	pthread_mutex_lock(&mount_mutex);
+    pthread_cond_signal(&mount_cond);
+    pthread_mutex_unlock(&mount_mutex);
 
 out:
 	free(context);
