@@ -47,7 +47,7 @@
 //#define HAVE_STRUCT_STAT_ST_ATIMENSEC 1
 
 /* Define to 1 if `st_atimespec' is a member of `struct stat'. */
-/* #undef HAVE_STRUCT_STAT_ST_ATIMESPEC */
+#define HAVE_STRUCT_STAT_ST_ATIMESPEC 1
 
 /* Define to 1 if you have the <sys/stat.h> header file. */
 #define HAVE_SYS_STAT_H 1
