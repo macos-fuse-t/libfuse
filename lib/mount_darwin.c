@@ -386,10 +386,6 @@ fuse_mount_core_wait(void *arg)
 		context = a->context;
 	}
 
-	if (!callback) {
-		goto out;
-	}
-
 	rv = send(fd, mount_cmd, strlen(mount_cmd), 0);
 	if (rv != strlen(mount_cmd)) {
 		perror("send mount command");
@@ -407,7 +403,8 @@ fuse_mount_core_wait(void *arg)
 		goto out;
 	}
 
-	callback(context, status, fd);
+	if (callback)
+		callback(context, status, fd);
 
 out:
 	free(arg);
@@ -561,20 +558,18 @@ fuse_mount_core(const char *mountpoint, struct mount_opts *mopts,
 		goto out;
 	}
 
-	if (callback) {
-		struct fuse_mount_core_wait_arg *arg =
-			calloc(1, sizeof(struct fuse_mount_core_wait_arg));
-		arg->fd = mon_fds[1];
-		arg->callback = callback;
-		arg->context = context;
+	struct fuse_mount_core_wait_arg *arg =
+		calloc(1, sizeof(struct fuse_mount_core_wait_arg));
+	arg->fd = mon_fds[1];
+	arg->callback = callback;
+	arg->context = context;
 
-		pthread_t mount_wait_thread;
-		int res = pthread_create(&mount_wait_thread, NULL,
-					 &fuse_mount_core_wait, (void *)arg);
-		if (res) {
-			perror("fuse: failed to wait for mount status");
-			goto mount_err_out;
-		}
+	pthread_t mount_wait_thread;
+	int res = pthread_create(&mount_wait_thread, NULL,
+				 &fuse_mount_core_wait, (void *)arg);
+	if (res) {
+		perror("fuse: failed to wait for mount status");
+		goto mount_err_out;
 	}
 
 	goto out;
