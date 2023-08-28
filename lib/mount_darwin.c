@@ -311,7 +311,7 @@ void fuse_kern_unmount(const char *mountpoint, int fd)
 		close(fd);
 	}
 
-    /* Terminate the server process */
+    /* Clean up the server process we forked */
     if (cpid != -1) {
         int status = 0;
         waitpid(cpid, &status, 0);
@@ -323,7 +323,6 @@ void fuse_kern_unmount(const char *mountpoint, int fd)
         pthread_join(mount_wait_thread, NULL);
         mount_wait_thread = 0;
     }
-
 }
 
 void
