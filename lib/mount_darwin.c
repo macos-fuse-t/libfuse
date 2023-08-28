@@ -313,15 +313,15 @@ void fuse_kern_unmount(const char *mountpoint, int fd)
 
     /* Terminate the server process */
     if (cpid != -1) {
-        kill(cpid, SIGTERM);
-
         int status = 0;
         waitpid(cpid, &status, 0);
+        cpid = -1;
     }
 
     /* Join our mount thread */
     if (mount_wait_thread) {
         pthread_join(mount_wait_thread, NULL);
+        mount_wait_thread = 0;
     }
 
 }
