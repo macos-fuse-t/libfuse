@@ -42,6 +42,9 @@
 static int quiet_mode = 0;
 static int debug_mode = 0;
 
+static pid_t cpid = -1;
+static pthread_t mount_wait_thread = 0;
+
 enum {
 	KEY_ALLOW_ROOT,
 	KEY_AUTO_CACHE,
@@ -307,6 +310,19 @@ void fuse_kern_unmount(const char *mountpoint, int fd)
 		send(fd, unmount_cmd, strlen(unmount_cmd), 0);
 		close(fd);
 	}
+
+    /* Clean up the server process we forked */
+    if (cpid != -1) {
+        int status = 0;
+        waitpid(cpid, &status, 0);
+        cpid = -1;
+    }
+
+    /* Join our mount thread */
+    if (mount_wait_thread) {
+        pthread_join(mount_wait_thread, NULL);
+        mount_wait_thread = 0;
+    }
 }
 
 void
@@ -460,7 +476,7 @@ fuse_mount_core(const char *mountpoint, struct mount_opts *mopts,
 		return -1;
 	}
 		
-	pid_t cpid = fork();
+	cpid = fork();
 
 	if (cpid == -1) {
 		perror("fuse: fork failed");
@@ -564,7 +580,6 @@ fuse_mount_core(const char *mountpoint, struct mount_opts *mopts,
 	arg->callback = callback;
 	arg->context = context;
 
-	pthread_t mount_wait_thread;
 	int res = pthread_create(&mount_wait_thread, NULL,
 				 &fuse_mount_core_wait, (void *)arg);
 	if (res) {
