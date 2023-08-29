@@ -197,7 +197,6 @@ static int fuse_loop_start_thread(struct fuse_mt *mt)
     /* We pick *2 to handle products using hard disks where there's */
     /* seek time and threads will be idle waiting for those seeks */
     if (mt->numworker >= cpus * 2) {
-        fprintf(stderr, "fuse: ran out of cpus %d\n", cpus);
         return 0;
     }
 #endif
