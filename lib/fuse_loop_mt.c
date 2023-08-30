@@ -24,7 +24,6 @@
 #ifdef __APPLE__
 #  define DARWIN_SEMAPHORE_COMPAT 1
 #  include "fuse_darwin_private.h"
-#  include <sys/sysctl.h>
 #else
 #  include <semaphore.h>
 #endif
@@ -186,20 +185,31 @@ int fuse_start_thread(pthread_t *thread_id, void *(*func)(void *), void *arg)
 	return 0;
 }
 
+#define FUSE_CLIENT_MAX_THREADS "FUSE_CLIENT_MAX_THREADS"
+
+static unsigned int getmaxthreadcount(void)
+{
+	unsigned int maxthreads = UINT_MAX;
+
+	if (getenv(FUSE_CLIENT_MAX_THREADS) != NULL) {
+		const int count = atoi(getenv(FUSE_CLIENT_MAX_THREADS));
+
+		if (count > 0) {
+			maxthreads = (unsigned int)count;
+		}
+		else {
+			maxthreads = UINT_MAX;
+		}
+	}
+
+	return maxthreads;
+}
+
 static int fuse_loop_start_thread(struct fuse_mt *mt)
 {
-#ifdef __APPLE__
-    /* Bound the number of threads (code based on the boost C++ library) */
-    int count;
-    size_t size = sizeof(count);
-    const int cpus = sysctlbyname("hw.ncpu", &count, &size, NULL, 0) ? 1 : count;
-    
-    /* We pick *2 to handle products using hard disks where there's */
-    /* seek time and threads will be idle waiting for those seeks */
-    if (mt->numworker >= cpus * 2) {
+    if (mt->numworker >= getmaxthreadcount()) {
         return 0;
     }
-#endif
     
 	int res;
 	struct fuse_worker *w = malloc(sizeof(struct fuse_worker));
