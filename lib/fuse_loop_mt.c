@@ -187,7 +187,7 @@ int fuse_start_thread(pthread_t *thread_id, void *(*func)(void *), void *arg)
 
 #define FUSE_CLIENT_MAX_THREADS "FUSE_CLIENT_MAX_THREADS"
 
-static unsigned int getmaxthreadcount(void)
+static unsigned int get_max_thread_count(void)
 {
 	unsigned int maxthreads = UINT_MAX;
 
@@ -207,7 +207,7 @@ static unsigned int getmaxthreadcount(void)
 
 static int fuse_loop_start_thread(struct fuse_mt *mt)
 {
-    if (mt->numworker >= getmaxthreadcount()) {
+    if (mt->numworker >= get_max_thread_count()) {
         return 0;
     }
     
