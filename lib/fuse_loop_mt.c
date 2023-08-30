@@ -185,8 +185,32 @@ int fuse_start_thread(pthread_t *thread_id, void *(*func)(void *), void *arg)
 	return 0;
 }
 
+#define FUSE_CLIENT_MAX_THREADS "FUSE_CLIENT_MAX_THREADS"
+
+static unsigned int get_max_thread_count(void)
+{
+	unsigned int maxthreads = UINT_MAX;
+
+	if (getenv(FUSE_CLIENT_MAX_THREADS) != NULL) {
+		const int count = atoi(getenv(FUSE_CLIENT_MAX_THREADS));
+
+		if (count > 0) {
+			maxthreads = (unsigned int)count;
+		}
+		else {
+			maxthreads = UINT_MAX;
+		}
+	}
+
+	return maxthreads;
+}
+
 static int fuse_loop_start_thread(struct fuse_mt *mt)
 {
+    if (mt->numworker >= get_max_thread_count()) {
+        return 0;
+    }
+    
 	int res;
 	struct fuse_worker *w = malloc(sizeof(struct fuse_worker));
 	if (!w) {
