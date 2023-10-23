@@ -81,6 +81,7 @@ struct mount_opts {
 	int nfc;
 	int noatime;
 	int nomtime;
+	int attrcache_tm;
 	char *location;
 };
 
@@ -207,6 +208,7 @@ static const struct fuse_opt fuse_mount_opts[] = {
 	{ "rwsize=%d", offsetof(struct mount_opts, rwsize), 0 },
 	FUSE_OPT_KEY("noatime",	      	KEY_NOATIME),
 	FUSE_OPT_KEY("nomtime",	      	KEY_NOMTIME),
+	{ "attrcache-timeout=%d", offsetof(struct mount_opts, attrcache_tm), 0 },
 	FUSE_OPT_END
 };
 
@@ -491,6 +493,7 @@ fuse_mount_core(const char *mountpoint, struct mount_opts *mopts,
 		char daemon_path[PROC_PIDPATHINFO_MAXSIZE];
 		char commfd[10];
 		char rwsize_str[64];
+		char attrtm_str[64];
 
 		const char *argv[32];
 		int a = 0;
@@ -548,6 +551,10 @@ fuse_mount_core(const char *mountpoint, struct mount_opts *mopts,
 		if (mopts->location) {
 			argv[a++] = "--location";
 			argv[a++] = mopts->location;
+		}
+		if (mopts->attrcache_tm) {
+			sprintf(attrtm_str, "--attrcache-timeout=%d", mopts->attrcache_tm);
+			argv[a++] = attrtm_str;
 		}
 
 		argv[a++] = mountpoint;
