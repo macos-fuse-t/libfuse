@@ -83,6 +83,7 @@ struct mount_opts {
 	int nomtime;
 	int attrcache_tm;
 	char *location;
+	char *backend;
 };
 
 static const struct fuse_opt fuse_mount_opts[] = {
@@ -209,6 +210,7 @@ static const struct fuse_opt fuse_mount_opts[] = {
 	FUSE_OPT_KEY("noatime",	      	KEY_NOATIME),
 	FUSE_OPT_KEY("nomtime",	      	KEY_NOMTIME),
 	{ "attrcache-timeout=%d", offsetof(struct mount_opts, attrcache_tm), 0 },
+	{ "backend=%s", offsetof(struct mount_opts, backend), 0 },
 	FUSE_OPT_END
 };
 
@@ -551,6 +553,10 @@ fuse_mount_core(const char *mountpoint, struct mount_opts *mopts,
 		if (mopts->location) {
 			argv[a++] = "--location";
 			argv[a++] = mopts->location;
+		}
+		if (mopts->backend) {
+			argv[a++] = "--backend";
+			argv[a++] = mopts->backend;
 		}
 		if (mopts->attrcache_tm) {
 			sprintf(attrtm_str, "--attrcache-timeout=%d", mopts->attrcache_tm);
