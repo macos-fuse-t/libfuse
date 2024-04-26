@@ -432,6 +432,13 @@ out:
 }
 
 static int
+file_exists(const char *filename) {
+    struct stat st;
+    int ret = stat(filename, &st);
+    return !ret;
+}
+
+static int
 fuse_mount_core(const char *mountpoint, struct mount_opts *mopts,
 		void (*callback)(void *, int, int), void *context)
 {
@@ -454,8 +461,18 @@ fuse_mount_core(const char *mountpoint, struct mount_opts *mopts,
 	signal(SIGCHLD, SIG_DFL); /* So that we can wait4() below. */
 
 	srv_path = getenv("FUSE_NFSSRV_PATH");
-	if (!srv_path)
-		srv_path = FUSE_NFSSRV_PROG;
+	if (!srv_path) {
+		char *home_dir = getenv("HOME");
+		if (home_dir) {
+			char srv_path_home[PATH_MAX];
+			snprintf(srv_path_home, PATH_MAX, "%s/.fuse-t/%s", home_dir, FUSE_NFSSRV_PROG);
+			if (file_exists(srv_path_home)) {
+				srv_path = srv_path_home;
+			}
+		}
+		if (!srv_path)
+			srv_path = FUSE_NFSSRV_PROG;
+	}
 	mount_prog_path = fuse_resource_path(srv_path);
 	if (!mount_prog_path) {
 		fprintf(stderr, "fuse: mount program missing\n");
