@@ -280,7 +280,7 @@ static void fuse_mount_common_callback(void *context, int status, int mon_fd)
 	}
 
 	if (status) {
-		fprintf(stderr, "fuse: mount failed with errro: %d\n", status);
+		fprintf(stderr, "fuse: mount failed with error: %d\n", status);
 		fuse_chan_destroy(ch);
 		//exit(-1);
 	}
