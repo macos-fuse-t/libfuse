@@ -156,7 +156,7 @@ struct fuse_forget_data {
 #define FUSE_SET_ATTR_CRTIME	(1 << 28)
 #define FUSE_SET_ATTR_CHGTIME	(1 << 29)
 #define FUSE_SET_ATTR_BKUPTIME	(1 << 30)
-#define FUSE_SET_ATTR_FLAGS	(1 << 31)
+#define FUSE_SET_ATTR_FLAGS	(1U << 31)
 #endif /* __APPLE__ */
 
 /* ----------------------------------------------------------- *

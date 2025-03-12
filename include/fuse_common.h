@@ -71,7 +71,7 @@ extern "C" {
 #define SETATTR_WANTS_CRTIME(attr)	((attr)->valid & (1 << 28))
 #define SETATTR_WANTS_CHGTIME(attr)	((attr)->valid & (1 << 29))
 #define SETATTR_WANTS_BKUPTIME(attr)	((attr)->valid & (1 << 30))
-#define SETATTR_WANTS_FLAGS(attr)	((attr)->valid & (1 << 31))
+#define SETATTR_WANTS_FLAGS(attr)	((attr)->valid & (1U << 31))
 
 struct setattr_x {
 	int32_t valid;
@@ -178,7 +178,7 @@ struct fuse_file_info {
 #  define FUSE_CAP_EXCHANGE_DATA	(1 << 28)
 #  define FUSE_CAP_CASE_INSENSITIVE	(1 << 29)
 #  define FUSE_CAP_VOL_RENAME		(1 << 30)
-#  define FUSE_CAP_XTIMES		(1 << 31)
+#  define FUSE_CAP_XTIMES		(1U << 31)
 #endif /* __APPLE__ */
 
 /**
