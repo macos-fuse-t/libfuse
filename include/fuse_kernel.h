@@ -192,7 +192,7 @@ struct fuse_file_lock {
 #define FATTR_CRTIME	(1 << 28)
 #define FATTR_CHGTIME	(1 << 29)
 #define FATTR_BKUPTIME	(1 << 30)
-#define FATTR_FLAGS	(1 << 31)
+#define FATTR_FLAGS	(1U << 31)
 #endif
 
 /**
@@ -207,7 +207,7 @@ struct fuse_file_lock {
 #define FOPEN_NONSEEKABLE	(1 << 2)
 #ifdef __APPLE__
 #define FOPEN_PURGE_ATTR	(1 << 30)
-#define FOPEN_PURGE_UBC		(1 << 31)
+#define FOPEN_PURGE_UBC		(1U << 31)
 #endif
 
 /**
@@ -233,7 +233,7 @@ struct fuse_file_lock {
 #  define FUSE_EXCHANGE_DATA	(1 << 28)
 #  define FUSE_CASE_INSENSITIVE	(1 << 29)
 #  define FUSE_VOL_RENAME	(1 << 30)
-#  define FUSE_XTIMES		(1 << 31)
+#  define FUSE_XTIMES		(1U << 31)
 #endif
 
 /**
