@@ -62,7 +62,6 @@ enum {
 	KEY_NOATIME,
 	KEY_NOMTIME,
 	KEY_NFC,
-	KEY_NOAPPLEDOUBLE,
 };
 
 struct mount_opts {
@@ -82,7 +81,6 @@ struct mount_opts {
 	int nfc;
 	int noatime;
 	int nomtime;
-	int noappledouble;
 	int attrcache_tm;
 	char *location;
 	char *backend;
@@ -185,7 +183,7 @@ static const struct fuse_opt fuse_mount_opts[] = {
 	FUSE_OPT_KEY("native_xattr",	      KEY_KERN),
 	FUSE_OPT_KEY("negative_vncache",      KEY_KERN),
 	FUSE_OPT_KEY("noalerts",	      KEY_KERN),
-	FUSE_OPT_KEY("noappledouble",	      KEY_NOAPPLEDOUBLE),
+	FUSE_OPT_KEY("noappledouble",	      KEY_KERN),
 	FUSE_OPT_KEY("noapplexattr",	      KEY_KERN),
 	FUSE_OPT_KEY("noattrcache",	      KEY_NOATTRCACHE),
 	FUSE_OPT_KEY("noautonotify",	      KEY_KERN),
@@ -303,9 +301,6 @@ fuse_mount_opt_proc(void *data, const char *arg, int key,
 			return 0;
 		case KEY_NOMTIME:
 			mo->nomtime = 1;
-			return 0;
-		case KEY_NOAPPLEDOUBLE:
-			mo->noappledouble = 1;
 			return 0;
 	}
 	return 1;
@@ -571,9 +566,6 @@ fuse_mount_core(const char *mountpoint, struct mount_opts *mopts,
 		}
 		if (mopts->nomtime) {
 			argv[a++] = "--nomtime=true";
-		}
-		if (mopts->noappledouble) {
-			argv[a++] = "--noappledouble=true";
 		}
 		if (mopts->location) {
 			argv[a++] = "--location";
