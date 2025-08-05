@@ -62,6 +62,7 @@ enum {
 	KEY_NOATIME,
 	KEY_NOMTIME,
 	KEY_NFC,
+	KEY_NAMEDATTR,
 };
 
 struct mount_opts {
@@ -75,6 +76,7 @@ struct mount_opts {
 	char *listen_addr;
 	int read_only;
 	int nonamedattr;
+	int namedattr;
 	int noattrcache;
 	int rwsize;
 	int nobrowse;
@@ -205,6 +207,7 @@ static const struct fuse_opt fuse_mount_opts[] = {
 	FUSE_OPT_KEY("-d",		     	  KEY_DEBUG),
 	{ "listen_addr=%s", offsetof(struct mount_opts, listen_addr), 0 },
 	FUSE_OPT_KEY("nonamedattr",	      KEY_NONAMEDATTR),
+	FUSE_OPT_KEY("namedattr",	      KEY_NAMEDATTR),
 	FUSE_OPT_KEY("nfc",	      		KEY_NFC),
 	{ "rwsize=%d", offsetof(struct mount_opts, rwsize), 0 },
 	FUSE_OPT_KEY("noatime",	      	KEY_NOATIME),
@@ -286,6 +289,9 @@ fuse_mount_opt_proc(void *data, const char *arg, int key,
 			break;
 		case KEY_NONAMEDATTR:
 			mo->nonamedattr = 1;
+			return 0;
+		case KEY_NAMEDATTR:
+			mo->namedattr = 1;
 			return 0;
 		case KEY_NOATTRCACHE:
 			mo->noattrcache = 1;
@@ -547,6 +553,9 @@ fuse_mount_core(const char *mountpoint, struct mount_opts *mopts,
 		}
 		if (mopts->nonamedattr) {
 			argv[a++] = "--namedattr=false";
+		}
+		if (mopts->namedattr) {
+			argv[a++] = "--namedattr=true";
 		}
 		if (mopts->noattrcache) {
 			argv[a++] = "--attrcache=false";
