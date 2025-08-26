@@ -88,7 +88,7 @@ again:
 			return -err;
 		}
 		if (res < len) {
-			fprintf(stderr, "short read on fuse device\n");
+			//fprintf(stderr, "short read on fuse device\n");
 			return -EIO;
 		}
 	}
