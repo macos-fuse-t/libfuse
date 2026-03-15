@@ -82,6 +82,9 @@ void fuse_remove_signal_handlers(struct fuse_session *se)
 	set_one_signal_handler(SIGHUP, exit_handler, 1);
 	set_one_signal_handler(SIGINT, exit_handler, 1);
 	set_one_signal_handler(SIGTERM, exit_handler, 1);
-	set_one_signal_handler(SIGPIPE, SIG_IGN, 1);
+	/* FUSE-T uses sockets (NFS backend) instead of /dev/fuse.
+	 * SIGPIPE must stay ignored because socket writes can occur
+	 * during cleanup after the peer closes the connection.
+	 * Do NOT restore SIGPIPE to SIG_DFL here. */
 }
 

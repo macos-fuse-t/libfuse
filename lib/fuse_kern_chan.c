@@ -64,10 +64,17 @@ again:
 			state++;
 			total += res;
 		}
-			
+
 		err = errno;
 
 		if (fuse_session_exited(se)) {
+			return 0;
+		}
+		/* recv() returns 0 on EOF (socket closed). This happens
+		 * during normal unmount when the NFS backend tears down
+		 * the connection. Treat it as a clean session exit. */
+		if (res == 0) {
+			fuse_session_exit(se);
 			return 0;
 		}
 		if (res == -1) {
