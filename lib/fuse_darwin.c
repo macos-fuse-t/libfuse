@@ -349,6 +349,8 @@ fuse_lib_constructor(void)
 static void
 fuse_lib_destructor(void)
 {
-	CFRelease(fuse_dasession);
+	if (fuse_dasession) {
+		CFRelease(fuse_dasession);
+	}
 	fuse_dasession = NULL;
 }
