@@ -894,16 +894,23 @@ static int xmp_removexattr(const char *path, const char *name)
 }
 #endif /* HAVE_SETXATTR */
 
-#ifndef __APPLE__
 static int xmp_lock(const char *path, struct fuse_file_info *fi, int cmd,
 		    struct flock *lock)
 {
+	int res;
 	(void) path;
 
+#ifdef __APPLE__
+	res = fcntl(fi->fh, cmd, lock);
+	if (res == -1)
+		return -errno;
+
+	return 0;
+#else
 	return ulockmgr_op(fi->fh, cmd, lock, &fi->lock_owner,
 			   sizeof(fi->lock_owner));
-}
 #endif
+}
 
 void *
 xmp_init(struct fuse_conn_info *conn)
@@ -979,8 +986,8 @@ static struct fuse_operations xmp_oper = {
 	.listxattr	= xmp_listxattr,
 	.removexattr	= xmp_removexattr,
 #endif
-#ifndef __APPLE__
 	.lock		= xmp_lock,
+#ifndef __APPLE__
 	.flock		= xmp_flock,
 #endif
 #ifdef __APPLE__
