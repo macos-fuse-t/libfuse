@@ -42,8 +42,60 @@
 static int quiet_mode = 0;
 static int debug_mode = 0;
 
-static pid_t cpid = -1;
-static pthread_t mount_wait_thread = 0;
+/*
+ * One record per mount, so that unmounting one mount reaps its own server
+ * and joins its own wait thread rather than those of the last mount made.
+ * Keyed by the monitor fd, which is what fuse_kern_unmount() is handed.
+ */
+struct mount_rec {
+	int mon_fd;
+	pid_t pid;
+	pthread_t thread;
+	int delivered;	/* mon_fd has been passed to the mount callback */
+	struct mount_rec *next;
+};
+
+static pthread_mutex_t mounts_lock = PTHREAD_MUTEX_INITIALIZER;
+static struct mount_rec *mounts = NULL;
+
+/*
+ * Unlink and return the record for mon_fd. With no usable fd (the callback
+ * never ran, so the caller never learned it), fall back to the newest record
+ * that was never delivered, which is what a single mount always gets.
+ */
+static struct mount_rec *
+take_mount_rec(int mon_fd)
+{
+	struct mount_rec **p, **found = NULL;
+
+	pthread_mutex_lock(&mounts_lock);
+	for (p = &mounts; *p; p = &(*p)->next) {
+		if (mon_fd > 0 ? (*p)->mon_fd == mon_fd : !(*p)->delivered) {
+			found = p;
+			break;
+		}
+	}
+	struct mount_rec *rec = found ? *found : NULL;
+	if (rec)
+		*found = rec->next;
+	pthread_mutex_unlock(&mounts_lock);
+	return rec;
+}
+
+static void
+mark_delivered(int mon_fd)
+{
+	struct mount_rec *rec;
+
+	pthread_mutex_lock(&mounts_lock);
+	for (rec = mounts; rec; rec = rec->next) {
+		if (rec->mon_fd == mon_fd) {
+			rec->delivered = 1;
+			break;
+		}
+	}
+	pthread_mutex_unlock(&mounts_lock);
+}
 
 enum {
 	KEY_ALLOW_ROOT,
@@ -315,24 +367,29 @@ fuse_mount_opt_proc(void *data, const char *arg, int key,
 
 void fuse_kern_unmount(const char *mountpoint, int fd)
 {
+	/* Before the close: once fd is closed its number can go to a new mount. */
+	struct mount_rec *rec = take_mount_rec(fd);
+
 	if (fd > 0) {
 		char unmount_cmd[] = "unmount";
 		send(fd, unmount_cmd, strlen(unmount_cmd), 0);
 		close(fd);
 	}
 
+    if (!rec)
+        return;
+
     /* Clean up the server process we forked */
-    if (cpid != -1) {
+    if (rec->pid != -1) {
         int status = 0;
-        waitpid(cpid, &status, 0);
-        cpid = -1;
+        waitpid(rec->pid, &status, 0);
     }
 
     /* Join our mount thread */
-    if (mount_wait_thread) {
-        pthread_join(mount_wait_thread, NULL);
-        mount_wait_thread = 0;
-    }
+    if (rec->thread)
+        pthread_join(rec->thread, NULL);
+
+    free(rec);
 }
 
 void
@@ -429,6 +486,7 @@ fuse_mount_core_wait(void *arg)
 		goto out;
 	}
 
+	mark_delivered(fd);
 	if (callback)
 		callback(context, status, fd);
 
@@ -464,7 +522,19 @@ fuse_mount_core(const char *mountpoint, struct mount_opts *mopts,
 		return -1;
 	}
 
-	signal(SIGCHLD, SIG_DFL); /* So that we can wait4() below. */
+	/*
+	 * fuse_kern_unmount() reaps the server with waitpid(), which an ignored
+	 * SIGCHLD defeats. Undo only that: a handler belongs to the program, and
+	 * resetting the process-wide disposition would silently remove it.
+	 */
+	struct sigaction chld;
+	if (sigaction(SIGCHLD, NULL, &chld) == 0 &&
+	    (chld.sa_handler == SIG_IGN || (chld.sa_flags & SA_NOCLDWAIT))) {
+		if (chld.sa_handler == SIG_IGN)
+			chld.sa_handler = SIG_DFL;
+		chld.sa_flags &= ~SA_NOCLDWAIT;
+		sigaction(SIGCHLD, &chld, NULL);
+	}
 
 	srv_path = getenv("FUSE_NFSSRV_PATH");
 	if (!srv_path) {
@@ -503,9 +573,9 @@ fuse_mount_core(const char *mountpoint, struct mount_opts *mopts,
 		return -1;
 	}
 		
-	cpid = fork();
+	pid = fork();
 
-	if (cpid == -1) {
+	if (pid == -1) {
 		perror("fuse: fork failed");
 		close(fds[0]);
 		close(fds[1]);
@@ -514,7 +584,7 @@ fuse_mount_core(const char *mountpoint, struct mount_opts *mopts,
 		_exit(1);
 	}
 
-	if (cpid == 0) {
+	if (pid == 0) {
 		char daemon_path[PROC_PIDPATHINFO_MAXSIZE];
 		char commfd[10];
 		char rwsize_str[64];
@@ -609,18 +679,37 @@ fuse_mount_core(const char *mountpoint, struct mount_opts *mopts,
 	close(mon_fds[0]);
 	fd = fds[1];
 
-	if (getenv("FUSE_NO_MOUNT")) {
-		goto out;
+	struct mount_rec *rec = calloc(1, sizeof(struct mount_rec));
+	if (!rec) {
+		perror("fuse: failed to allocate mount record");
+		goto mount_err_out;
 	}
+	rec->mon_fd = mon_fds[1];
+	rec->pid = pid;
 
-	struct fuse_mount_core_wait_arg *arg =
-		calloc(1, sizeof(struct fuse_mount_core_wait_arg));
-	arg->fd = mon_fds[1];
-	arg->callback = callback;
-	arg->context = context;
+	int res = 0;
 
-	int res = pthread_create(&mount_wait_thread, NULL,
-				 &fuse_mount_core_wait, (void *)arg);
+	/*
+	 * Published only once complete: the wait thread looks the record up
+	 * under this lock, and an unmount must not take it half-built.
+	 */
+	pthread_mutex_lock(&mounts_lock);
+	if (!getenv("FUSE_NO_MOUNT")) {
+		struct fuse_mount_core_wait_arg *arg =
+			calloc(1, sizeof(struct fuse_mount_core_wait_arg));
+		arg->fd = mon_fds[1];
+		arg->callback = callback;
+		arg->context = context;
+
+		res = pthread_create(&rec->thread, NULL,
+				     &fuse_mount_core_wait, (void *)arg);
+		if (res)
+			rec->thread = 0;
+	}
+	rec->next = mounts;
+	mounts = rec;
+	pthread_mutex_unlock(&mounts_lock);
+
 	if (res) {
 		perror("fuse: failed to wait for mount status");
 		goto mount_err_out;
