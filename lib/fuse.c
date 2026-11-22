@@ -3245,12 +3245,18 @@ static void fuse_lib_setattr_x(fuse_req_t req, fuse_ino_t ino,
 		}
 		if (!err && (valid & FUSE_SET_ATTR_BKUPTIME)) {
 			err = fuse_fs_setbkuptime(f->fs, path, &attr->bkuptime);
+			if (err == -ENOSYS)
+				err = 0;
 		}
 		if (!err && (valid & FUSE_SET_ATTR_CHGTIME)) {
 			err = fuse_fs_setchgtime(f->fs, path, &attr->chgtime);
+			if (err == -ENOSYS)
+				err = 0;
 		}
 		if (!err && (valid & FUSE_SET_ATTR_CRTIME)) {
 			err = fuse_fs_setcrtime(f->fs, path, &attr->crtime);
+			if (err == -ENOSYS)
+				err = 0;
 		}
 		if (!err && (valid & FUSE_SET_ATTR_MODE))
 			err = fuse_fs_chmod(f->fs, path, attr->mode);
@@ -3334,18 +3340,24 @@ static void fuse_lib_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 			tv.tv_sec = (uint64_t)(attr->st_qspare[0]);
 			tv.tv_nsec = (uint32_t)(attr->st_lspare);
 			err = fuse_fs_setbkuptime(f->fs, path, &tv);
+			if (err == -ENOSYS)
+				err = 0;
 		}
 		if (!err && (valid & FUSE_SET_ATTR_CHGTIME)) {
 			struct timespec tv;
 			tv.tv_sec = (uint64_t)(attr->st_ctime);
 			tv.tv_nsec = (uint32_t)ST_CTIM_NSEC(attr);
 			err = fuse_fs_setchgtime(f->fs, path, &tv);
+			if (err == -ENOSYS)
+				err = 0;
 		}
 		if (!err && (valid & FUSE_SET_ATTR_CRTIME)) {
 			struct timespec tv;
 			tv.tv_sec = (uint64_t)(attr->st_qspare[1]);
 			tv.tv_nsec = (uint32_t)(attr->st_gen);
 			err = fuse_fs_setcrtime(f->fs, path, &tv);
+			if (err == -ENOSYS)
+				err = 0;
 		}
 #endif /* __APPLE__ */
 		if (!err && (valid & FUSE_SET_ATTR_MODE))
